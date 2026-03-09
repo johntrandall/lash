@@ -1,0 +1,17 @@
+{
+  "name": "lash",
+  "description": "Manifest-driven symlink installer — installs itself and its skill",
+  "operations": [
+    {
+      "type": "symlink",
+      "src": "./lash",
+      "dest": "~/.local/bin/lash",
+      "chmod": "+x"
+    },
+    {
+      "type": "symlink",
+      "src": "./skill",
+      "dest": "~/.claude/skills/lash-installer"
+    }
+  ]
+}
