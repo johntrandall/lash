@@ -159,12 +159,11 @@ def do_json_merge_install(op: dict, base: Path) -> bool:
         if not isinstance(arr, list):
             print(f"  {red('✗')} {path} is not an array in {filepath}")
             return False
-        match_key = op.get("match_key")
         value = op["value"]
-        if match_key:
-            if any(item.get(match_key) == value.get(match_key) for item in arr if isinstance(item, dict)):
-                print(f"  {green('✓')} JSON entry already present at {path}")
-                return True
+        # Deep equality: skip only if the exact same entry already exists
+        if any(item == value for item in arr):
+            print(f"  {green('✓')} JSON entry already present at {path}")
+            return True
         arr.append(value)
     elif action == "set":
         parent, key = json_ensure_path(data, path)
@@ -193,25 +192,20 @@ def do_json_merge_uninstall(op: dict, base: Path) -> bool:
         if arr is None or not isinstance(arr, list):
             print(f"  {dim('-')} {path} not found or not an array")
             return True
-        match_key = op.get("match_key")
         value = op["value"]
-        if match_key:
-            original_len = len(arr)
-            arr[:] = [item for item in arr if not (isinstance(item, dict) and item.get(match_key) == value.get(match_key))]
-            if len(arr) < original_len:
-                parent[key] = arr
-                # Clean up empty arrays
-                if len(arr) == 0:
-                    del parent[key]
-                filepath.write_text(json.dumps(data, indent=2) + "\n")
-                print(f"  {green('✓')} JSON entry removed from {path}")
-                return True
-            else:
-                print(f"  {dim('-')} No matching entry at {path}")
-                return True
+        original_len = len(arr)
+        arr[:] = [item for item in arr if item != value]
+        if len(arr) < original_len:
+            parent[key] = arr
+            # Clean up empty arrays
+            if len(arr) == 0:
+                del parent[key]
+            filepath.write_text(json.dumps(data, indent=2) + "\n")
+            print(f"  {green('✓')} JSON entry removed from {path}")
+            return True
         else:
-            print(f"  {yellow('⚠')} Cannot remove append_unique without match_key")
-            return False
+            print(f"  {dim('-')} No matching entry at {path}")
+            return True
     elif action == "set":
         parent, key, val = json_get(data, path)
         if parent is not None and key in parent:
@@ -241,10 +235,9 @@ def do_json_merge_status(op: dict, base: Path) -> bool:
         if arr is None or not isinstance(arr, list):
             print(f"  {red('✗')} {filepath.name}: {path} missing")
             return False
-        match_key = op.get("match_key")
         value = op["value"]
-        if match_key and any(isinstance(item, dict) and item.get(match_key) == value.get(match_key) for item in arr):
-            print(f"  {green('✓')} {filepath.name}: {path} [{match_key}={value.get(match_key)}]")
+        if any(item == value for item in arr):
+            print(f"  {green('✓')} {filepath.name}: {path} entry present")
             return True
         print(f"  {red('✗')} {filepath.name}: {path} entry missing")
         return False
