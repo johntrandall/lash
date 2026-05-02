@@ -1,2 +1,10 @@
 __pycache__/
 tests/__pycache__/
+
+# Build artifacts
+dist/
+*.egg-info/
+
+# Local-only working notes (predate public release; not for distribution)
+pair-lash-context.md
+public-readiness-checklist.md
