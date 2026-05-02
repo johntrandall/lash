@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lash"
+name = "lash-installer"
 version = "0.1.0"
-description = "Manifest-driven symlink installer. Reads lash.json and executes operations forward (install) or backward (uninstall), keeping them in sync."
+description = "Manifest-driven symlink installer. Reads lash.json and executes operations forward (install) or backward (uninstall), keeping them in sync. CLI command: `lash`."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "lash contributors" }]

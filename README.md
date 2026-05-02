@@ -20,9 +20,27 @@ lash replaces both with a single JSON manifest. Install reads forward, uninstall
 
 ## Quick start
 
+### Install
+
 ```bash
-# Clone and bootstrap lash itself
-git clone https://github.com/johntrandall/lash.git ~/dev/lash
+# Once on PyPI (preferred):
+uv tool install lash-installer
+
+# For now (or if you want to track main):
+uv tool install git+https://github.com/johntrandall/lash
+
+# Or the bootstrap path (clone + self-install via the bundled lash.json):
+git clone https://github.com/johntrandall/lash.git ~/dev/lash && cd ~/dev/lash && ./lash install
+```
+
+After install, `lash` is on your `PATH`.
+
+> **PyPI package name vs CLI name**: the package is published as `lash-installer` (because `lash` is taken on PyPI by an unrelated project). The CLI command stays `lash` regardless of how you installed it.
+
+### Use
+
+```bash
+# Bootstrap lash itself if you cloned manually:
 cd ~/dev/lash
 ./lash install
 
