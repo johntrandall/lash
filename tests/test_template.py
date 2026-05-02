@@ -133,6 +133,32 @@ def test_template_install_backs_up_existing_file():
         assert backup.read_text() == "pre-existing"
 
 
+def test_template_install_replaces_dangling_symlink():
+    """Regression: dangling symlink at dest must not write-through to a
+    deleted target. is_symlink() is checked before exists()."""
+    with tempfile.TemporaryDirectory() as d:
+        base = Path(d)
+        src = base / "t.tmpl"
+        src.write_text("rendered={{X}}")
+        # Create a dangling symlink at dest (target inside another temp dir
+        # that we then delete to make the symlink dangling).
+        ghost = base / "ghost"
+        ghost.write_text("not-rendered")
+        dest = base / "out"
+        dest.symlink_to(ghost.resolve())
+        ghost.unlink()  # Make the symlink dangling.
+        assert dest.is_symlink() and not dest.exists()
+
+        op = {"type": "template", "src": str(src), "dest": str(dest),
+              "vars": {"X": "1"}}
+        assert lash.do_template_install(op, base) is True
+        # dest must be a real file with rendered content, not a symlink.
+        assert not dest.is_symlink()
+        assert dest.read_text() == "rendered=1"
+        # The dangling target's path must NOT have been recreated.
+        assert not ghost.exists()
+
+
 def test_template_install_unset_env_no_default_fails():
     with tempfile.TemporaryDirectory() as d:
         base = Path(d)

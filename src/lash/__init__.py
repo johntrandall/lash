@@ -462,17 +462,21 @@ def do_template_install(op: dict, base: Path) -> bool:
 
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    if dest.exists():
-        if dest.is_symlink():
-            dest.unlink()
-        else:
-            existing = dest.read_text()
-            if existing == rendered:
-                print(f"  {green('✓')} Already rendered: {dest}")
-                return True
-            backup = dest.with_suffix(dest.suffix + ".lash-backup")
-            shutil.move(str(dest), str(backup))
-            print(f"  {yellow('⚠')} Backed up existing file: {backup}")
+    # is_symlink() is checked BEFORE exists() because exists() follows the
+    # symlink — a dangling symlink (target deleted) returns False from
+    # exists() but True from is_symlink(). Without this order, write_text()
+    # below would follow the dangling symlink and recreate the target file
+    # at the now-stale location.
+    if dest.is_symlink():
+        dest.unlink()
+    elif dest.exists():
+        existing = dest.read_text()
+        if existing == rendered:
+            print(f"  {green('✓')} Already rendered: {dest}")
+            return True
+        backup = dest.with_suffix(dest.suffix + ".lash-backup")
+        shutil.move(str(dest), str(backup))
+        print(f"  {yellow('⚠')} Backed up existing file: {backup}")
 
     dest.write_text(rendered)
     print(f"  {green('✓')} Rendered: {dest} ← {src}")
