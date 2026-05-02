@@ -380,6 +380,163 @@ def do_shell_verify(op: dict, base: Path) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Template operation
+#
+# Renders a source file with `{{KEY}}` placeholders into a destination file,
+# substituting values from the `vars` map. Useful when launchd plists or
+# similar files need absolute paths that can't be expressed via $HOME or ~
+# (launchd does not interpolate those in plist string values).
+#
+# Manifest shape:
+#   {
+#     "type": "template",
+#     "src":  "./path/to/template.plist.tmpl",
+#     "dest": "~/Library/LaunchAgents/foo.plist",
+#     "vars": {
+#       "HOME": "@env:HOME",          # read from environment
+#       "USER": "@env:USER:fallback", # env with default if unset
+#       "REGION": "us-east-1"         # literal value
+#     }
+#   }
+#
+# Substitution is a literal string replace of `{{KEY}}` for each var. No
+# expressions, no nested braces. Vars are resolved at install/uninstall/
+# status time, so a re-run picks up environment changes.
+# ---------------------------------------------------------------------------
+
+def _resolve_template_vars(vars_spec: dict) -> dict:
+    """Resolve a `vars` map to concrete strings.
+
+    Strings starting with `@env:` are read from os.environ. The form
+    `@env:NAME:default` uses `default` if NAME is unset. Plain strings
+    are passed through.
+
+    Raises ValueError for an unset env var with no default.
+    """
+    resolved = {}
+    for key, raw in vars_spec.items():
+        if not isinstance(raw, str):
+            resolved[key] = str(raw)
+            continue
+        if raw.startswith("@env:"):
+            spec = raw[len("@env:"):]
+            if ":" in spec:
+                name, default = spec.split(":", 1)
+                resolved[key] = os.environ.get(name, default)
+            else:
+                value = os.environ.get(spec)
+                if value is None:
+                    raise ValueError(
+                        f"template var '{key}' references unset env var '{spec}' "
+                        f"(use '@env:{spec}:fallback' to provide a default)"
+                    )
+                resolved[key] = value
+        else:
+            resolved[key] = raw
+    return resolved
+
+
+def _render_template(src_text: str, vars_resolved: dict) -> str:
+    out = src_text
+    for key, value in vars_resolved.items():
+        out = out.replace("{{" + key + "}}", value)
+    return out
+
+
+def do_template_install(op: dict, base: Path) -> bool:
+    src = expand(op["src"], base, follow_symlinks=True)
+    dest = expand(op["dest"], base)
+
+    if not src.exists():
+        print(f"  {red('✗')} Template source does not exist: {src}")
+        return False
+
+    try:
+        vars_resolved = _resolve_template_vars(op.get("vars", {}))
+    except ValueError as e:
+        print(f"  {red('✗')} {e}")
+        return False
+
+    rendered = _render_template(src.read_text(), vars_resolved)
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if dest.exists():
+        if dest.is_symlink():
+            dest.unlink()
+        else:
+            existing = dest.read_text()
+            if existing == rendered:
+                print(f"  {green('✓')} Already rendered: {dest}")
+                return True
+            backup = dest.with_suffix(dest.suffix + ".lash-backup")
+            shutil.move(str(dest), str(backup))
+            print(f"  {yellow('⚠')} Backed up existing file: {backup}")
+
+    dest.write_text(rendered)
+    print(f"  {green('✓')} Rendered: {dest} ← {src}")
+    return True
+
+
+def do_template_uninstall(op: dict, base: Path) -> bool:
+    dest = expand(op["dest"], base)
+
+    if dest.exists():
+        if dest.is_symlink():
+            print(f"  {yellow('⚠')} {dest} is a symlink, not a rendered template — skipping")
+            return False
+        dest.unlink()
+        print(f"  {green('✓')} Removed: {dest}")
+        backup = dest.with_suffix(dest.suffix + ".lash-backup")
+        if backup.exists():
+            shutil.move(str(backup), str(dest))
+            print(f"  {yellow('↩')} Restored backup: {backup.name}")
+        return True
+    print(f"  {dim('-')} {dest} not found (already removed)")
+    return True
+
+
+def do_template_status(op: dict, base: Path) -> bool:
+    dest = expand(op["dest"], base)
+    if dest.exists() and not dest.is_symlink():
+        print(f"  {green('✓')} {dest}")
+        return True
+    print(f"  {red('✗')} {dest} missing")
+    return False
+
+
+def do_template_verify(op: dict, base: Path) -> bool:
+    src = expand(op["src"], base, follow_symlinks=True)
+    dest = expand(op["dest"], base)
+
+    if not dest.exists():
+        print(f"  {red('FAIL')} {dest} missing")
+        return False
+    if dest.is_symlink():
+        print(f"  {red('FAIL')} {dest} is a symlink (expected rendered file)")
+        return False
+    if not src.exists():
+        print(f"  {red('FAIL')} template source missing: {src}")
+        return False
+
+    try:
+        vars_resolved = _resolve_template_vars(op.get("vars", {}))
+    except ValueError as e:
+        print(f"  {red('FAIL')} {e}")
+        return False
+
+    expected = _render_template(src.read_text(), vars_resolved)
+    actual = dest.read_text()
+    if actual != expected:
+        print(f"  {red('FAIL')} {dest} content does not match freshly-rendered template")
+        return False
+
+    print(f"  {green('PASS')} {dest} ← {src}")
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Dispatch tables
 # ---------------------------------------------------------------------------
 
@@ -387,24 +544,28 @@ INSTALL_HANDLERS = {
     "symlink":    do_symlink_install,
     "json_merge": do_json_merge_install,
     "shell":      do_shell_install,
+    "template":   do_template_install,
 }
 
 UNINSTALL_HANDLERS = {
     "symlink":    do_symlink_uninstall,
     "json_merge": do_json_merge_uninstall,
     "shell":      do_shell_uninstall,
+    "template":   do_template_uninstall,
 }
 
 STATUS_HANDLERS = {
     "symlink":    do_symlink_status,
     "json_merge": do_json_merge_status,
     "shell":      do_shell_status,
+    "template":   do_template_status,
 }
 
 VERIFY_HANDLERS = {
     "symlink":    do_symlink_verify,
     "json_merge": do_json_merge_verify,
     "shell":      do_shell_verify,
+    "template":   do_template_verify,
 }
 
 # ---------------------------------------------------------------------------

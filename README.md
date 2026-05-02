@@ -272,6 +272,53 @@ Runs arbitrary shell commands. An escape hatch for operations that don't fit sym
 
 All commands run with the manifest directory as the working directory. If a field is omitted, that phase is a no-op.
 
+### `template`
+
+Renders a source file with `{{KEY}}` placeholders into a destination file, substituting values from the `vars` map. Useful when the destination file format doesn't support environment-variable interpolation — the canonical case is launchd plists (which can't expand `$HOME` or `~` in string values), but the same pattern fits any per-machine config that needs absolute paths or shortname-specific values.
+
+```json
+{
+  "type": "template",
+  "src":  "./LaunchAgents/com.example.foo.plist.tmpl",
+  "dest": "~/Library/LaunchAgents/com.example.foo.plist",
+  "vars": {
+    "HOME":   "@env:HOME",
+    "USER":   "@env:USER",
+    "REGION": "us-east-1"
+  }
+}
+```
+
+The template file uses `{{KEY}}` placeholders:
+
+```xml
+<key>ProgramArguments</key>
+<array>
+    <string>{{HOME}}/.local/bin/foo</string>
+</array>
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `src` | yes | Template source file (relative to manifest dir or absolute) |
+| `dest` | yes | Destination path (`~` expanded) |
+| `vars` | no | Map of placeholder name → value (default: empty) |
+
+Variable values can be:
+- A literal string (e.g., `"REGION": "us-east-1"`)
+- `@env:NAME` — read from the environment; install fails if the env var is unset
+- `@env:NAME:default` — read from environment with a fallback when unset
+
+Substitution is a literal string replace of `{{KEY}}` per var. No expressions, no nested braces. Unknown placeholders in the template are left alone (visible at runtime — useful for debugging).
+
+**Install** renders src + vars → writes dest. If dest already exists with the exact rendered content, it's left untouched (idempotent). If dest exists with different content, it's backed up to `dest.lash-backup` before being overwritten.
+
+**Uninstall** removes dest and restores any `.lash-backup` (mirroring `symlink`).
+
+**Status** checks dest exists and is not a symlink.
+
+**Verify** is strict: dest exists and contents equal a fresh re-render. Drift fails verification, so a downstream agent can detect when env vars or template source have changed without anyone re-running install.
+
 ## Real-world examples
 
 ### Self-installing CLI tool
