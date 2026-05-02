@@ -1,6 +1,7 @@
 ---
 name: lash-installer
 description: Use lash for manifest-driven install/uninstall of symlink-based CLI tools. Auto-invoke when creating install.sh/uninstall.sh scripts, setting up symlinks into ~/.claude/ or ~/.local/bin/, or when a project needs an install manifest.
+type: procedure
 ---
 
 # lash — Manifest-Driven Symlink Installer
