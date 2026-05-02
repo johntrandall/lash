@@ -24,20 +24,34 @@ lash replaces both with a single JSON manifest. Install reads forward, uninstall
 
 ### Install
 
+**Homebrew (macOS):**
+
 ```bash
-# Once on PyPI (preferred):
-uv tool install lash-installer
-
-# For now (or if you want to track main):
-uv tool install git+https://github.com/johntrandall/lash
-
-# Or the bootstrap path (clone + self-install via the bundled lash.json):
-git clone https://github.com/johntrandall/lash.git ~/dev/lash && cd ~/dev/lash && ./lash install
+brew tap johntrandall/tap
+brew install lash
 ```
 
-After install, `lash` is on your `PATH`.
+**uv (Python tool, cross-platform):**
 
-> **PyPI package name vs CLI name**: the package is published as `lash-installer` (because `lash` is taken on PyPI by an unrelated project). The CLI command stays `lash` regardless of how you installed it.
+```bash
+uv tool install lash-installer       # PyPI name
+# Or track main:
+uv tool install git+https://github.com/johntrandall/lash
+```
+
+**From source (no package manager):**
+
+```bash
+git clone https://github.com/johntrandall/lash.git ~/dev/lash
+cd ~/dev/lash && ./lash install      # bootstrap via the bundled lash.json
+```
+
+After any of the above, `lash` is on your `PATH`.
+
+> **Naming notes:**
+> - **Homebrew formula**: `lash` (in `johntrandall/tap`)
+> - **PyPI package**: `lash-installer` (the bare `lash` name is taken on PyPI by an unrelated project)
+> - **CLI command**: `lash` (regardless of install path)
 
 ### Use
 
