@@ -4,6 +4,8 @@ A manifest-driven symlink installer. Define your project's install operations on
 
 Born out of frustration with paired `install.sh` / `uninstall.sh` scripts that inevitably drift apart. With lash, the manifest is the single source of truth.
 
+> **Used by**: [oplx-tools](https://github.com/johntrandall/oplx-tools) (Python tooling for OmniPlan `.oplx` files) installs its Claude Code lint hook via lash. See [`oplx-tools/lash.json`](https://github.com/johntrandall/oplx-tools/blob/main/lash.json) for a real-world example: one shell op (`uv tool install`), one symlink op (hook into `~/.claude/hooks/`), one `json_merge` op (patches `~/.claude/settings.json`'s `PostToolUse` array).
+
 ## Why lash?
 
 Most developer tools need to place files in specific locations — CLI binaries in `~/.local/bin/`, config snippets in `~/.config/`, hooks in `~/.claude/hooks/`. The typical approach is a shell script that creates symlinks, patches config files, and runs setup commands. Then you need a matching uninstall script that reverses everything. These scripts always drift.
